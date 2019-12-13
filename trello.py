@@ -49,15 +49,32 @@ def column_check(column_name):
     # Получим данные всех колонок на доске
     column_data = requests.get(base_url.format('boards') \
 		+ '/' + board_id + '/lists', params=auth_params).json()
-	# Переберём данные обо всех колонках, пока не найдём ту колонку, которая нам нужна  
-    for column in column_data:
-        if column['name'] == column_name:
-            column_id = column['id']
-            break
-	# Возвращаем id нашей колонки
+    # Создадим список для дублированных колонок
+    duplicated_columns = [column for column in column_data if column['name'] == column_name]
+    # Если не найдено дублированных колонок
+    if not duplicated_columns:
+        return column_id
+    # Если найдены дубликаты колонок,
+    if len(duplicated_columns) > 1:
+        print("Колонок с таким названием несколько штук:")
+        # то выводим id дубликатов колонок
+        for index, column in enumerate(duplicated_columns):
+            print("Колонка '{}' #{}\tid: {}".format(column_name, index + 1, column['id']))
+        index = int(input("Пожалуйста, введите номер необходимой колонки: "))
+        while index < 1 or index > len(duplicated_columns):
+            index = int(input("Пожалуйста, введите номер необходимой колонки: "))
+        # Получаем id нашей колонки
+        column_id = duplicated_columns[index - 1]['id']
+    else:
+        # Получаем id нашей колонки
+        column_id = duplicated_columns[0]['id']
+    # Возвращаем id нашей колонки
     return column_id
 
 def create_column(column_name, showstatus):
+    if column_name == '':
+        print("--- Пустая строка ---")
+        return
     request = requests.get(base_url.format('boards') + '/' + board_id, params=auth_params)
     if request.status_code != 200:
         print('--- Возникла ошибка {}.'.format(request.status_code))
@@ -76,6 +93,9 @@ def create_column(column_name, showstatus):
     return request
 
 def create_task(name, column_name):
+    if name == '' or column_name == '':
+        print("--- Пустая строка ---")
+        return
     # Проверяем существует ли колонка
     column_id = column_check(column_name)
     # Если не существует,
@@ -93,6 +113,9 @@ def create_task(name, column_name):
         	+ 'Задача "{}" не добавлена! ---'.format(name))
 
 def move_task(name, column_name):
+    if name == '' or column_name == '':
+        print("--- Пустая строка ---")
+        return
     # Проверим существуют ли дубликаты нашей задачи
     duplicated_tasks = get_duplicated_tasks(name)
     # Если задачи не существует,
@@ -107,9 +130,13 @@ def move_task(name, column_name):
         for index, task in enumerate(duplicated_tasks):
             task_column_name = requests.get(base_url.format('lists') \
             	+ '/' + task['idList'], params=auth_params).json()['name']
-            print("Задача #{}\tid: {}\tНаходится в колонке: {}\t ".format \
-                (index, task['id'], task_column_name))
-        task_id = input("Пожалуйста, введите ID задачи, которую нужно переместить: ")
+            print("Задача #{}\tid: {}\tНаходится в колонке: {}".format \
+                (index + 1, task['id'], task_column_name))
+        index = int(input("Пожалуйста, введите номер задачи, которую нужно переместить: "))
+        while index < 1 or index > len(duplicated_tasks):
+            index = int(input("Пожалуйста, введите номер задачи, которую нужно переместить: "))
+        # Получаем id нашей колонки
+        task_id = duplicated_tasks[index - 1]['id']
     else:
         task_id = duplicated_tasks[0]['id']
     # Проверяем существует ли колонка
@@ -130,6 +157,9 @@ def move_task(name, column_name):
         	+ 'Задача "{}" не перемещена! ---'.format(name))
 
 def delete_column(column_name):
+    if column_name == '':
+        print("--- Пустая строка ---")
+        return
 	# Проверяем существует ли колонка
     column_id = column_check(column_name)
     # Если колонкине существует,
@@ -148,6 +178,9 @@ def delete_column(column_name):
         	+ 'Колонка "{}" не удалена! ---'.format(column_name))
 
 def delete_task(name):
+    if name == '':
+        print("--- Пустая строка ---")
+        return
     # Проверим существуют ли дубликаты нашей задачи
     duplicated_tasks = get_duplicated_tasks(name)
     # Если задачи не существует,
@@ -162,9 +195,12 @@ def delete_task(name):
         for index, task in enumerate(duplicated_tasks):
             task_column_name = requests.get(base_url.format('lists') \
             	+ '/' + task['idList'], params=auth_params).json()['name']
-            print("Задача #{}\tid: {}\tНаходится в колонке: {}\t ".format \
-                (index, task['id'], task_column_name))
-        task_id = input("Пожалуйста, введите ID задачи, которую нужно удалить: ")
+            print("Задача #{}\tid: {}\tНаходится в колонке: {}".format \
+                (index + 1, task['id'], task_column_name))
+        index = int(input("Пожалуйста, введите номер задачи, которую нужно удалить: "))
+        while index < 1 or index > len(duplicated_tasks):
+            index = int(input("Пожалуйста, введите номер задачи, которую нужно удалить: "))
+        task_id = duplicated_tasks[index - 1]['id']
     else:
         task_id = duplicated_tasks[0]['id'] 	
     # Удалим задачу в найденной колонке
@@ -190,17 +226,20 @@ def help():
     print('\tПример: python trello.py -dt "task_name"')
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:      # Выводим колонки и их список задач
-        read_task()
-    elif sys.argv[1] == '-ct': # Создаем задачу в определенной колонке
-        create_task(sys.argv[2], sys.argv[3])
-    elif sys.argv[1] == '-cc': # Создаем колонку
-        create_column(sys.argv[2], True)
-    elif sys.argv[1] == '-mt': # Перемаещем задачу в другую колонку
-        move_task(sys.argv[2], sys.argv[3])
-    elif sys.argv[1] == '-dc': # Удаляем колонку
-        delete_column(sys.argv[2])
-    elif sys.argv[1] == '-dt': # Удаляем задачу
-        delete_task(sys.argv[2])
-    else:
-    	help()
+    try:
+        if len(sys.argv) < 2:      # Выводим колонки и их список задач
+            read_task()
+        elif sys.argv[1] == '-ct': # Создаем задачу в определенной колонке
+            create_task(sys.argv[2], sys.argv[3])
+        elif sys.argv[1] == '-cc': # Создаем колонку
+            create_column(sys.argv[2], True)
+        elif sys.argv[1] == '-mt': # Перемаещем задачу в другую колонку
+            move_task(sys.argv[2], sys.argv[3])
+        elif sys.argv[1] == '-dc': # Удаляем колонку
+            delete_column(sys.argv[2])
+        elif sys.argv[1] == '-dt': # Удаляем задачу
+            delete_task(sys.argv[2])
+        else:
+            help()
+    except:
+        help()
